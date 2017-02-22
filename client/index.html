@@ -1,13 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script type="text/babel" >
-        "use strict";
-    
+        let canvas;
+        let ctx;
+        //our websocket connection
+        let socket; 
+		let draws = {};
+		let user = 'user' + (Math.floor((Math.random() * 1000)) + 1)
+		const setCalls = () =>{
+			var time = new Date().getTime();
+			draws[user] = {x:100, y:100, width: 50, height: 50};
+			var xCoord = Math.floor((Math.random() * 400) + 1);
+			var yCoord = Math.floor((Math.random() * 400) + 1);
+			var coords = {x: xCoord, y:yCoord, width: 50, height: 50};
+			socket.emit('draw', {lastUpdate: time, coords: coords, user: user});
+	   }
+		
+        
+        //redraw our square to the screen
+        const draw = () => {
+            ctx.clearRect(0, 0,800,800);
+            //draw our updated squares
+			var keys = Object.keys(draws);
+			for(var i=0; i < keys.length; i++)
+			{
+				if(i == 0){
+				ctx.fillStyle = "red";
+				}
+				else{
+				ctx.fillStyle = "black";
+				}
+				var drawCall = draws[keys[i]];
+				ctx.fillRect(drawCall.coords.x, drawCall.coords.y, drawCall.coords.width, drawCall.coords.height);
+			}
+
+        }
+        //when a message is received from the server
+        //update our square to match the server's response
+		
+		//loop through, do for each key
+        const handleMessage = (data) => {
+			//console.dir(data);
+			draws = data;
+			var keys = Object.keys(draws);
+			for(var i=0; i < keys.length; i++)
+			{
+				if(!draws[keys[i]]){
+					draws[keys[i]] = data[keys[i]].coords;
+				}
+				else if(data.lastUpdate > draws[keys[i]].lastUpdate)
+				{
+					draws[keys[i]] = data[keys[i]].coords;
+				}
+			}
+			draw();
+        }
+
+		const init = () => {
+            canvas = document.querySelector("#canvas");
+            ctx = canvas.getContext("2d");
+        
+            socket = io.connect();
+            
+            //When the socket connects successfully
+            socket.on('connect', () => {
+                setCalls();
+				setInterval(() =>{
+		
+					var time = new Date().getTime();
+					var keys = Object.keys(draws);
+					for(var i=0; i < keys.length; i++)
+					{
+						if(keys[i] == user){
+							var direction = (Math.floor((Math.random() * 4)) + 1)
+							var drawCall = draws[keys[i]];
+							drawCall.lastUpdate = time;
+							if(direction == 1){
+							drawCall.coords.x += 5;
+							}
+							if(direction == 2){
+							drawCall.coords.y += 5;
+							}
+							if(direction == 3){
+							drawCall.coords.x -= 5;
+							}
+							if(direction == 4){
+							drawCall.coords.y -= 5;
+							}
+							socket.emit('draw', {lastUpdate: time,coords: draws[user].coords, user: user});
+							//draw();
+						}
+					}	
+				}, 3000);
+            });      
+            
+            //When our socket receives 'updatedMovement' messages from the server, call our update function
+            socket.on('draw', handleMessage);
+        }
+
+      window.onload = init;
     </script>
 </head>
-<body>
-
+<body> 
+    <canvas id="canvas" height="500" width="500">Please use an HTML 5 browser</canvas>
 </body>
+</html>
 </html>
